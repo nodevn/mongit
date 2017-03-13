@@ -2,7 +2,7 @@
   "name": "mongit",
   "version": "0.9.1",
   "description": "A simple SQL-like data querying language to mongodb converter",
-  "main": "lib/mongit.js",
+  "main": "mongit.js",
   "scripts": {
     "test": "node test/start | tap-spec"
   },
@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/nodevn/mongit#readme",
   "dependencies": {
+    "bluebird": "^3.5.0",
     "connect-mongodb": "^1.1.5",
     "mongodb": "^2.2.24",
     "mongoose": "^4.8.7",
