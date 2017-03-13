@@ -4,7 +4,7 @@
   "description": "A simple SQL-like data querying language to mongodb converter",
   "main": "lib/mongit.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/start | tap-spec"
   },
   "repository": {
     "type": "git",
@@ -20,5 +20,15 @@
   "bugs": {
     "url": "https://github.com/nodevn/mongit/issues"
   },
-  "homepage": "https://github.com/nodevn/mongit#readme"
+  "homepage": "https://github.com/nodevn/mongit#readme",
+  "dependencies": {
+    "connect-mongodb": "^1.1.5",
+    "mongodb": "^2.2.24",
+    "mongoose": "^4.8.7",
+    "tedious": "^1.15.0"
+  },
+  "devDependencies": {
+    "tap-spec": "^4.1.1",
+    "tape": "^4.6.3"
+  }
 }
