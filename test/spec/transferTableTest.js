@@ -2,24 +2,33 @@ const test = require('tape');
 const dbConfig = require('./dbConfig');
 const SqlConnection = require('../../sqlcon');
 const mongoose = require('mongoose');
+
 mongoose.Promise = require('bluebird');
-mongoose.connection.on('connected', () => {
-  console.log('%s MongoDB connection established!');
-});
-mongoose.connection.on('error', () => {
-  console.log('%s MongoDB connection error. Please make sure MongoDB is running.');
-  process.exit();
-});
+
 test('Transfer MSSQL to Mongodb', function (t) {
     t.plan(1);
     // init new connection
-    const sqlCon = new SqlConnection(dbConfig);
-    sqlCon.transferTable('HT_USER_GROUP', {
-        mongodb: 'mongodb://hosoytev2:ehrdev%40146@124.158.7.56:25101/hosoytedb'
-    })
-        .then(tableRowsCount => {
-            console.log('tableRowsCount:', tableRowsCount);
-            t.true(tableRowsCount > 0, 'tableRowsCount');
+    let sqlCon = new SqlConnection(dbConfig.sql_connection);
+    let mdbCon = dbConfig.mdb_connection;
+    let mdbConStr = `mongodb://${mdbCon.username}:${mdbCon.password}@${mdbCon.hostname}/${mdbCon.database}`;
+    let transferTableTest = dbConfig.sql_connection.transferTableTest;
+    console.log('sql_connection:', dbConfig.sql_connection);
+    console.log('mongodb_connection:', mdbConStr);
+    sqlCon.tableRowsCount(transferTableTest)
+        .then(rowsCount => {
+            if (rowsCount > 0) {
+                return sqlCon.transferTable(transferTableTest, {
+                    mongodb: mdbConStr
+                })
+            } else if (rowsCount === 0) {
+                return Promise.reject('No rows to export !');
+            } else {
+                return Promise.reject('No table found !');
+            }
+        })
+        .then(transferedRecords => {
+            // console.log('tableRowsCount:', transferedRecords);
+            t.true(transferedRecords.length > 0, 'transferedRecords should be greater than 0');
         })
         .catch(err => {
             t.end(err);

@@ -5,7 +5,7 @@ const SqlConnection = require('../../sqlcon');
 test('SQL connection ready', function (t) {
     t.plan(1);
     // init new connection
-    const sqlCon = new SqlConnection(dbConfig);
+    const sqlCon = new SqlConnection(dbConfig.sql_connection);
     sqlCon.testServer()
         .then(dbList => {
             console.log('dbList:', dbList);
@@ -18,10 +18,10 @@ test('SQL connection ready', function (t) {
 
 test('Count table rows number from master db', (t) => {
     t.plan(1);
-    let sqlCon = new SqlConnection(dbConfig);
-    sqlCon.tableRowsCount('spt_values')
+    let sqlCon = new SqlConnection(dbConfig.sql_connection);
+    sqlCon.tableRowsCount('sysrowsets', true)
         .then(rowsCount => {
-            t.true(rowsCount > 0, 'rowsCount should be greater than zero');
+            t.notEqual(rowsCount, 0, 'rows of sys.objects should be greater than 0');
         }).catch(err => {
             t.end(err);
         });
