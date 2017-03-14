@@ -52,7 +52,13 @@ class SqlConnection {
         });
     }
 
-    tableRowsCount(table) {
+    /**
+     * Count rows number of the table
+     * 
+     * @param {String} table wants to count
+     * @param {Boolean} is_ms_shipped indicates this object was shipped or created by Microsoft
+     */
+    tableRowsCount(table, is_ms_shipped) {
         return new Promise((resolve, reject) => {
             let conn = new Connection(this.config);
 
@@ -66,15 +72,15 @@ class SqlConnection {
                         FROM sys.partitions p
                         LEFT JOIN sys.objects obj ON obj.object_id = p.object_id
                         WHERE (p.index_id in (0, 1)) 
-                        AND (obj.is_ms_shipped = 0)
-                        AND (obj.type_desc = 'USER_TABLE')
+                        AND (obj.is_ms_shipped = ${!is_ms_shipped ? 0 : 1})
+                        AND (obj.type_desc = '${!is_ms_shipped ? 'USER_TABLE' : 'SYSTEM_TABLE'}')
                         AND (obj.name = '${table}')
                     `;
                     let request = new Request(query, (err, rowCount) => {
                         if (err) {
                             return reject(err);
-                        } else {
-                            console.log('rowCount: ', rowCount);
+                            // } else {
+                            //     console.log('rowCount: ', rowCount, query);
                         }
                     });
 
@@ -90,125 +96,148 @@ class SqlConnection {
 
     transferTable(table, options) {
         return new Promise((resolve, reject) => {
-            let rows = [];
-            let columns = [];
-            let schema = {};
-            let ItemSchema = {};
-            let ItemModel = {};
-            let request = {};
-            let mongoDbServer = options.mongodb;
             let lastRowId = 0;
             let count = 10000;
             let insertRows = 0;
             let readRows = 0;
-            let types = require('./types');
             let dbConfig = this.config;
+            // let mongoConnection = mongoose.createConnection(options.mongodb);
+            let mongoConnection = mongoose.connect(options.mongodb, (err) => {
+                if (err) {
+                    return reject(err);
+                }
+                // preparing data
+                this.tableRowsCount(table)
+                    .then(tableRowsCount => {
+                        console.log('tableRowsCount: ', tableRowsCount);
+                        // start transfer
 
-
-            this.tableRowsCount(table)
-                .then(tableRowsCount => {
-                    console.log('tableRowsCount: ', tableRowsCount);
-                    // start transfer
-                    mongoose.connect(mongoDbServer);
-                    startTransfer(lastRowId, count, tableRowsCount, (err, notifyMsg) => {
-                        if (err) {
-                            console.error('startTransfer ERROR:', err);
-                            reject(err);
-                        } else {
-                            if (notifyMsg === 'Transfer Finished!') {
-                                resolve(tableRowsCount);
+                        startTransfer(lastRowId, count, tableRowsCount, (err, notifyMsg) => {
+                            if (err) {
+                                console.error('startTransfer ERROR:', err);
+                                reject(err);
+                            } else {
+                                if (notifyMsg === 'Transfer Finished!') {
+                                    resolve(tableRowsCount);
+                                }
                             }
-                        }
+                        });
+                    })
+                    .catch(err => {
+                        reject(err);
                     });
-                })
-                .catch(err => {
-                    reject(err);
-                });
+                // end: connect mongoose
+            });
+
+            mongoose.connection.on('connected', () => {
+                console.log('[+] MongoDB connection established!');
+            });
+            mongoose.connection.on('error', () => {
+                console.log('[-] MongoDB connection error. Please make sure MongoDB is running.');
+            });
 
             function startTransfer(start, count, tableRowsCount, callback) {
-                let iStart = parseInt(start);
-                if (iStart >= tableRowsCount) {
-                    return callback(null, 'Transfer Finished!');
-                }
-                let query = `
-                    DECLARE @columnName NVARCHAR(60)
-                    SET @columnName = (SELECT TOP 1 NAME FROM sys.columns WHERE object_id = OBJECT_ID('dbo.${table}'))
-                    SELECT * FROM (
-                        SELECT ROW_NUMBER() OVER(ORDER BY @columnName) AS row, T.*
-                        FROM (SELECT * FROM ${table}) T
-                    ) T2 WHERE T2.row BETWEEN ${start} AND ${start + count}
+                let task = new Promise((resolve, reject) => {
+
+                    let iStart = parseInt(start);
+                    if (iStart >= tableRowsCount) {
+                        return resolve({
+                            message: 'Transfer Finished!',
+                            tableRowsCount: iStart
+                        });
+                    }
+                    let query = `
+                        DECLARE @columnName NVARCHAR(60)
+                        SET @columnName = (SELECT TOP 1 NAME FROM sys.columns WHERE object_id = OBJECT_ID('dbo.${table}'))
+                        SELECT * FROM (
+                            SELECT ROW_NUMBER() OVER(ORDER BY @columnName) AS row, T.*
+                            FROM (SELECT * FROM ${table}) T
+                        ) T2 WHERE T2.row BETWEEN ${start} AND ${start + count}
                     `;
-                let sqlcon = new Connection(dbConfig);
-                sqlcon.on('errorMessage', err => {
-                    callback(err);
-                });
-                sqlcon.on('connect', err => {
-                    if (err) {
-                        console.log('$startTransfer:', err);
+
+                    let sqlcon = new Connection(dbConfig);
+                    // console.log('start Query: ', query);
+                    sqlcon.on('errorMessage', err => {
                         callback(err);
-                    } else {
-                        let request = new Request(query, err => {
-                            if (err) {
-                                return callback(err);
-                            }
-                        });
-
-                        request.on('columnMetadata', allColumns => {
-                            if (insertRows === 0) {
-                                // reset schema fields.
-                                schema = {};
-                                for (let column of allColumns) {
-                                    let type = types[column.type.name];
-                                    schema[column.colName] = type;
-                                    console.info(`Cast type [${column.type.name} to ${type}]`);
-                                }
-                                ItemSchema = new Schema(schema);
-                                try {
-                                    ItemModel = mongoose.model(table);
-                                } catch (err) {
-                                    ItemModel = mongoose.model(table, ItemSchema);
-                                }
-                            }
-                        });
-
-                        request.on('row', row => {
-                            if (++readRows % 1000 == 0) {
-                                callback(null, readRows);
-                            }
-
-                            let newRow = {};
-                            for (let col of row) {
-                                for (let field in schema) {
-                                    if (field === col.metadata.colName) {
-                                        newRow[field] = col.value;
-                                        break;
-                                    }
-                                }
-                            }
-                            console.log('readRows: ', readRows);
-                            let newItem = new ItemModel(newRow);
-                            newItem.save((err, result) => {
+                    });
+                    sqlcon.on('connect', err => {
+                        if (err) {
+                            console.error('$startTransfer:', err);
+                            callback(err);
+                        } else {
+                            let records = [];
+                            let schema = {};
+                            let request = new Request(query, err => {
                                 if (err) {
-                                    console.error('ERROR save failed: ', err);
-                                    callback(err.stack || err);
-                                } else {
-                                    console.log('insertRows: ', insertRows);
-                                    if ((++insertRows % 1000) === 0) {
-                                        callback(null, insertRows);
-                                    }
+                                    return callback(err);
                                 }
                             });
-                        });
 
-                        request.on('doneProc', () => {
-                            lastRowId = lastRowId + count;
-                            startTransfer(lastRowId, count, tableRowsCount, callback);
-                        });
+                            request.on('columnMetadata', allColumns => {
+                                // console.info('columnMetadata', allColumns);
+                                if (insertRows === 0) {
+                                    // declare schema fields.
+                                    let types = require('./types');
+                                    for (let column of allColumns) {
+                                        let type = types[column.type.name];
+                                        schema[column.colName] = type;
+                                        console.info(`Cast type [${column.type.name} to ${type}]`);
+                                    }
+                                    // setup new mongodb schema
+                                    let docSchema = new Schema(schema);
+                                    mongoose.model(table, docSchema);
+                                }
+                            });
 
-                        // start sql
-                        sqlcon.execSql(request);
-                    }
+                            request.on('row', row => {
+                                if (++readRows % 1000 == 0) {
+                                    callback(null, readRows);
+                                }
+
+                                let newRow = {};
+                                for (let col of row) {
+                                    for (let field in schema) {
+                                        if (field === col.metadata.colName) {
+                                            newRow[field] = col.value;
+                                            break;
+                                        }
+                                    }
+                                }
+                                records.push(newRow);
+                            });
+
+                            request.on('doneProc', () => {
+                                console.log('doneProc !!!!!!!!!!, readRows:', readRows);
+                                lastRowId = lastRowId + count;
+                                resolve(records);
+                            });
+
+                            // start sql
+                            sqlcon.execSql(request);
+                        }
+                    });
                 });
+                // end: Promise
+                return task.then(dataRows => {
+                        return new Promise((resolve, reject) => {
+                            mongoose.model(table).create(dataRows)
+                                .then(result => {
+                                    resolve(result)
+                                })
+                                .catch(err => {
+                                    console.error('ERROR save failed: ', err);
+                                    reject(err);
+                                });
+                        })
+                    })
+                    .then(result => {
+                        // continue ?
+                        // startTransfer(lastRowId, count, tableRowsCount, callback);
+                        resolve(result);
+                    })
+                    .catch(err => {
+                        callback(err);
+                    })
             }
         });
     }
