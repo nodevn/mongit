@@ -1,10 +1,18 @@
 {
-    "userName": "sa",
-    "password": "sa123456",
-    "server": "localhost",
-    "options": {
-        "port": 49175,
-        "database": "master",
-        "instancename": "SQLEXPRESS"
+    "sql_connection": {
+        "userName": "sa",
+        "password": "sa123456",
+        "server": "localhost",
+        "options": {
+            "port": 49175,
+            "database": "master",
+            "instancename": "SQLEXPRESS"
+        }
+    },
+    "mdb_connection": {
+        "username": "?",
+        "password": "?",
+        "hostname": "?",
+        "database": "?"
     }
 }
