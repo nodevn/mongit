@@ -22,11 +22,11 @@
   },
   "homepage": "https://github.com/nodevn/mongit#readme",
   "dependencies": {
-    "bluebird": "^3.5.0",
-    "connect-mongodb": "^1.1.5",
-    "mongodb": "^2.2.24",
-    "mongoose": "^4.8.7",
-    "tedious": "^1.15.0"
+    "bluebird": "3.5.0",
+    "connect-mongodb": "1.1.5",
+    "mongodb": "2.2.24",
+    "mongoose": "4.9.0",
+    "tedious": "1.15.0"
   },
   "devDependencies": {
     "tap-spec": "^4.1.1",
