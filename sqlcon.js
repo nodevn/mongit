@@ -1,3 +1,4 @@
+const _ = require('lodash');
 const Connection = require('tedious').Connection;
 const Request = require('tedious').Request;
 const TYPES = require('tedious').TYPES;
@@ -206,7 +207,7 @@ class SqlConnection {
                                 records.push(newRow);
                             });
 
-                            request.on('doneProc', () => {
+                            request.on('doneProc', (rowCount, more, status, rows) => {
                                 console.log('doneProc !!!!!!!!!!, readRows:', readRows);
                                 lastRowId = lastRowId + count;
                                 resolve(records);
@@ -240,6 +241,38 @@ class SqlConnection {
                     })
             }
         });
+    }
+
+    getSqlData(query) {
+        return new Promise((resolve, reject) => {
+
+            let dbConfig = _.extend({}, this.config);
+            dbConfig.options['rowCollectionOnRequestCompletion'] = true;
+            
+            let sqlcon = new Connection(dbConfig);
+
+            sqlcon.on('errorMessage', err => {
+                return reject(err);
+            });
+
+            sqlcon.on('connect', err => {
+                if (err) {
+                    return reject(err);
+                }
+                // start query data;
+                console.log('start Query: ', query);
+                let request = new Request(query, (err, rowCount, rows) => {
+                    if (err) {
+                        return reject(err);
+                    } else {
+                        return resolve(rows);
+                    }
+                });
+               
+                // start sql
+                sqlcon.execSql(request);
+            });
+        }) // End: Promise receive data                    
     }
 }
 
