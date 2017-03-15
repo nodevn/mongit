@@ -5,7 +5,8 @@ var path = require('path');
  */
 var dir = '../test/spec/';
 [
-  'sqlconnTest',
+  'sqlConnTest',
+  'sqlQueryTest',
   'transferTableTest',
   'endTest',
 ].forEach((script) => {
