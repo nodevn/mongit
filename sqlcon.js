@@ -14,6 +14,8 @@ class SqlConnection {
     constructor(options) {
         // setup default config
         this.config = {};
+        this.Schema = Schema;
+        this.ObjectId = ObjectId;
 
         // override default config
         for (let opt in options) {
@@ -194,7 +196,7 @@ class SqlConnection {
                                 if (++readRows % 1000 == 0) {
                                     callback(null, readRows);
                                 }
-
+                                // console.log(row);
                                 let newRow = {};
                                 for (let col of row) {
                                     for (let field in schema) {
