@@ -11,7 +11,7 @@ test('Translation SQL Table to config files', function (t) {
     let trans = new Translation(dbConfig.sql_connection);
     trans.getTables()
         .then(tables => {
-            console.log(tables);
+            // console.log(tables);
             require('fs').writeFileSync('./data.json', JSON.stringify(tables, null, 2), 'utf-8'); 
             t.true(tables);
             t.end();
