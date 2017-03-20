@@ -43,6 +43,7 @@ class Translation extends SqlConnection {
                 if (err) {
                     return reject(err);
                 } else {
+                    let types = require('./types');
                     let tableInfo = {};
                     let query = `
                         SELECT ORDINAL_POSITION, COLUMN_NAME, TABLE_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, 
@@ -54,10 +55,13 @@ class Translation extends SqlConnection {
                             return reject(err);
                         }
                     });
+                    
+                    for (let [key, value] of _.entries(types)) {
+                        types[key.toLowerCase()] = value;
+                    }
 
                     request.on('row', row => {
                         // console.log(row);
-                        let types = require('./types');
                         let tableName = row.find(col => col.metadata.colName == 'TABLE_NAME').value;
                         let fieldName = row.find(col => col.metadata.colName == 'COLUMN_NAME').value;
                         
@@ -83,6 +87,8 @@ class Translation extends SqlConnection {
                             let attribute = col.metadata.colName;
                             schema[attribute] = col.value;
                         }
+                        // update type
+                        schema['TYPE'] = types[schema['DATA_TYPE']];
                     });
 
                     request.on('done', (rowCount) => {
